@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "concurrently \"pnpm --filter backend_ubahn dev\" \"pnpm --filter frontend_ubahn start\"",
     "start": "pnpm dev",
     "build": "pnpm --filter backend_ubahn build && pnpm --filter frontend_ubahn build",
