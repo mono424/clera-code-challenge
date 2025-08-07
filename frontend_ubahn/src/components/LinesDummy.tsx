@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Line } from "../types/Line";
-import axios from "axios";
 
 /**
  * Fetches and lists the lines from the backend
@@ -11,8 +10,9 @@ export default function LinesDummy() {
   const [lines, setLines] = useState<Line[]>([]);
   useEffect(() => {
     async function fetchLines() {
-      const response = await axios.get("http://localhost:8080/lines");
-      setLines(response.data);
+      const response = await fetch("http://localhost:8080/lines");
+      const data = await response.json();
+      setLines(data);
     }
 
     fetchLines();

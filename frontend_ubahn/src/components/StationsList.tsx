@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 
 interface StationsListProps {
   selectedLine: string | null;
@@ -26,10 +25,11 @@ export default function StationsList({
     async function fetchStations() {
       setLoading(true);
       try {
-        const response = await axios.get(
+        const response = await fetch(
           `http://localhost:8080/lines/${selectedLine}/stations`
         );
-        setStations(response.data);
+        const data = await response.json();
+        setStations(data);
       } catch (error) {
         console.error("Failed to fetch stations:", error);
         setStations([]);

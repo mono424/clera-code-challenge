@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Line } from "../types/Line";
-import axios from "axios";
 
 interface LineSelectorProps {
   selectedLine: string | null;
@@ -17,8 +16,9 @@ export default function LineSelector({
   useEffect(() => {
     async function fetchLines() {
       try {
-        const response = await axios.get("http://localhost:8080/lines");
-        setLines(response.data);
+        const response = await fetch("http://localhost:8080/lines");
+        const data = await response.json();
+        setLines(data);
       } catch (error) {
         console.error("Failed to fetch lines:", error);
       } finally {
