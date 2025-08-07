@@ -68,9 +68,15 @@ router.get(
   }
 );
 
-const nextStationsQuerySchema = z.strictObject({
-  maxStations: z.number().default(3),
-  direction: z.enum(Direction).default(Direction.Forward),
+const nextStationsQuerySchema = z.object({
+  maxStations: z.coerce
+    .number()
+    .optional()
+    .default(3),
+  direction: z
+    .enum(Direction)
+    .optional()
+    .default(Direction.Forward),
 });
 
 router.get(
