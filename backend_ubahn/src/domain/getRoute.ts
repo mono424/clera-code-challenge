@@ -1,3 +1,6 @@
+import { Direction } from "./Direction";
+import { getAccessibleLines } from "./getAccessibleLines";
+import { getNextStops } from "./getNextStops";
 import { Line } from "./Line";
 
 export type RouteSegment = {
@@ -16,64 +19,81 @@ export type RouteSegment = {
 
 export type Route = RouteSegment[];
 
-type Edge = {
-  from: string;
-  to: string;
-  line: string;
+const addSwitchSegmentIfNeeded = (
+  route: RouteSegment[],
+  line: Line,
+  station: string
+) => {
+  const result = [...route];
+  if (route.length > 0 && route[route.length - 1].line !== line) {
+    result.push({ action: "switch", station: station, line: line });
+  }
+  return result;
 };
 
-interface NetworkGraph {
-  nodes: string[];
-  edges: Edge[];
-}
-
-const createNetworkGraph = (allLines: Line[]): NetworkGraph => {
-  const nodes = [...new Set(allLines.flatMap((line) => line.stations))];
-  const edges = allLines.flatMap(
-    (line) =>
-      line.stations
-        .map((station, index) => ({
-          from: station,
-          to: line.stations[index + 1] ?? "",
-          line: line.name,
-        }))
-        .filter((edge) => edge.to !== "") // filter out edges that have no to station
-  );
-  return { nodes, edges };
-};
-
-const findShortestPath = (
-  graph: NetworkGraph,
+const shortestRoute = (
   originStation: string,
   destinationStation: string,
-  visited: Set<string> = new Set([originStation])
-): Edge[] | null => {
-  if (originStation === destinationStation) {
+  allLines: Line[],
+  currentLine: Line,
+  lookupLen: number,
+  visited: Set<string>,
+  currentRoute: RouteSegment[] = []
+): RouteSegment[] => {
+  const lines = getAccessibleLines(currentLine, originStation, allLines);
+  const nextStops = [currentLine, ...lines]
+    .flatMap((line) => [
+      ...getNextStops(
+        line,
+        Direction.Backward,
+        lookupLen,
+        originStation
+      ).map((station) => ({ line, station })),
+      ...getNextStops(
+        line,
+        Direction.Forward,
+        lookupLen,
+        originStation
+      ).map((station) => ({ line, station })),
+    ])
+    .filter(({ station }) => !visited.has(station));
+
+  if (nextStops.length === 0) {
     return [];
   }
 
-  const nextStations = graph.edges.filter(
-    (edge) => edge.from === originStation && !visited.has(edge.to)
+  const directRoute = nextStops.find(
+    ({ station }) => station === destinationStation
   );
-
-  const potentialRoutes = nextStations.map((s) => {
-    const shortestPath = findShortestPath(
-      graph,
-      s.to,
-      destinationStation,
-      new Set([...visited, s.to])
-    );
-    return shortestPath
-      ? [{ from: originStation, to: s.to, line: s.line }, ...shortestPath]
-      : [];
-  });
-
-  if (potentialRoutes.length === 0) {
-    return null;
+  if (directRoute) {
+    return [
+      ...addSwitchSegmentIfNeeded(
+        currentRoute,
+        directRoute.line,
+        originStation
+      ),
+      {
+        action: "exit",
+        ...directRoute,
+      },
+    ];
   }
 
-  const [shortestRoute] = potentialRoutes.sort((a, b) => a.length - b.length);
-  return shortestRoute;
+  for (const stop of nextStops) {
+    const route = shortestRoute(
+      stop.station,
+      destinationStation,
+      allLines,
+      stop.line,
+      lookupLen,
+      new Set([...visited, stop.station]),
+      addSwitchSegmentIfNeeded(currentRoute, stop.line, originStation)
+    );
+    if (route) {
+      return route;
+    }
+  }
+  return [];
 };
 
 /**
@@ -106,38 +126,34 @@ export function getRoute(
   destinationStation: string,
   allLines: Line[]
 ): Route {
-  const graph = createNetworkGraph(allLines);
-  const route = findShortestPath(graph, originStation, destinationStation);
-
-  if (!route) {
-    throw new Error("No route found");
+  const currentLine = allLines.filter((line) =>
+    line.stations.includes(originStation)
+  );
+  if (currentLine.length === 0) {
+    return [];
   }
 
-  const routeSegments: RouteSegment[] = [];
+  for (const line of currentLine) {
+    const route = shortestRoute(
+      originStation,
+      destinationStation,
+      allLines,
+      line,
+      100,
+      new Set([originStation]),
+      [
+        {
+          action: "enter",
+          station: originStation,
+          line: line,
+        },
+      ]
+    );
 
-  let currentLine: string | null = null;
-  for (const edge of route) {
-    if (currentLine === null) {
-      routeSegments.push({
-        action: "enter",
-        station: edge.to,
-        line: allLines.find((line) => line.name === edge.line)!,
-      });
-      currentLine = edge.line;
-    } else if (edge.line !== currentLine) {
-      routeSegments.push({
-        action: "switch",
-        station: edge.from,
-        line: allLines.find((line) => line.name === edge.line)!,
-      });
+    if (route) {
+      return route;
     }
   }
 
-  routeSegments.push({
-    action: "exit",
-    station: destinationStation,
-    line: allLines.find((line) => line.name === currentLine)!,
-  });
-
-  return routeSegments;
+  return [];
 }

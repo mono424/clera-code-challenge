@@ -1,6 +1,9 @@
 import express from "express";
 import { lines } from "../data";
-import z from "zod";
+import * as z from "zod";
+import { Direction } from "../domain/Direction";
+import { getAccessibleLines } from "../domain/getAccessibleLines";
+import { getNextStops } from "../domain/getNextStops";
 
 const router = express.Router();
 
@@ -67,7 +70,7 @@ router.get(
 
 const nextStationsQuerySchema = z.strictObject({
   maxStations: z.number().default(3),
-  direction: z.enum(["forward", "backward"]).default("forward"),
+  direction: z.enum(Direction).default(Direction.Forward),
 });
 
 router.get(
@@ -87,24 +90,21 @@ router.get(
 
     const { maxStations, direction } = parsedQuery.data;
 
-    const stations = lines.find((line) => line.name === requestedLineId)
-      ?.stations;
-
-    const stationIndex = (stations || []).findIndex(
-      (station) => station === requestedStationName
-    );
-
-    if (!stations || stationIndex === -1) {
+    const line = lines.find((line) => line.name === requestedLineId);
+    if (!line) {
       res.sendStatus(404);
       return;
     }
 
-    const nextStations =
-      direction === "forward"
-        ? stations.slice(stationIndex + 1, stationIndex + maxStations + 1)
-        : stations.slice(stationIndex - maxStations, stationIndex);
+    const station = line.stations.find(
+      (station) => station === requestedStationName
+    );
+    if (!station) {
+      res.sendStatus(404);
+      return;
+    }
 
-    res.send(nextStations);
+    res.send(getNextStops(line, direction, maxStations, station));
   }
 );
 
@@ -117,22 +117,23 @@ router.get(
     const requestedLineId = req.params.id;
     const requestedStationName = decodeURIComponent(req.params.stationName);
 
-    const stations = lines
-      .find((line) => line.name === requestedLineId)
-      ?.stations.find((station) => station === requestedStationName);
-
-    if (!stations) {
+    const requestedLine = lines.find((line) => line.name === requestedLineId);
+    if (!requestedLine) {
       res.sendStatus(404);
       return;
     }
 
-    const availableLines = lines.filter(
-      (line) =>
-        line.name !== requestedLineId &&
-        line.stations.includes(requestedStationName)
-    );
-
-    res.send(availableLines);
+    try {
+      const accessibleLines = getAccessibleLines(
+        requestedLine,
+        requestedStationName,
+        lines
+      );
+      res.send(accessibleLines);
+    } catch (error) {
+      res.sendStatus(404);
+      return;
+    }
   }
 );
 

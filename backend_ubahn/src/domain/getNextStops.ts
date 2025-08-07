@@ -24,6 +24,14 @@ export function getNextStops(
    */
   fromStation: string
 ): string[] {
-  // TODO: implement
-  throw new Error("Not implemented");
+  const stations = line.stations;
+  const stationIndex = stations.indexOf(fromStation);
+
+  if (stationIndex === -1) {
+    throw new Error("Station not found");
+  }
+
+  return direction === Direction.Forward
+    ? stations.slice(stationIndex + 1, stationIndex + nStops + 1)
+    : stations.slice(stationIndex - nStops, stationIndex).reverse();
 }

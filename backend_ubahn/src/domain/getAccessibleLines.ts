@@ -11,6 +11,7 @@ export function getAccessibleLines(
   fromStation: string,
   allLines: Line[]
 ): Line[] {
-  // TODO: implement
-  throw new Error("not implemented");
+  return allLines.filter(
+    (line) => line.name !== onLine.name && line.stations.includes(fromStation)
+  );
 }
